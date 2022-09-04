@@ -45,7 +45,7 @@ class SumOfSquaredDigitsCalculator():
         Calculate the sum of squared digits for all non-negative integers
         in [0, 10^n], where n >= 0.
 
-    get_sums_of_squared_digit_counts()
+    get_sums_of_squared_digits_distribution()
         Get a list of sum of squared digits counts
     """
 
@@ -98,7 +98,7 @@ class SumOfSquaredDigitsCalculator():
             self.__value_counts = self.__value_counts[SumOfSquaredDigitsCalculator.offset:]
         self.__value_counts[1] += Integer(1) # Take into account 10^n, whose sum of squared digits is 1.
 
-    def get_sums_of_squared_digit_counts(self) -> List[Integer]:
+    def get_sums_of_squared_digits_distribution(self) -> List[Integer]:
         """Get the distribution of sums of squared digits.
 
         Parameters
@@ -125,42 +125,54 @@ class HappyNumberCounter():
     ----------
     ssdd : List of sympy Integers
         ssdd stands for sum of squared digits distribution, which is the output 
-        of SumOfSquaredDigitsCalculator.get_sums_of_squared_digit_counts().
+        of SumOfSquaredDigitsCalculator.get_sums_of_squared_digits_distribution().
 
     Methods
     -------
     """
 
-    def __init__(self, ssdd):
-        self.__ssdd = ssdd
-        self.__cat_happy_unhappy = None
+    memo_size = 200000
+
+    def __init__(self):
+        self.__memo_size = HappyNumberCounter.memo_size
+        self.__cat_happy_unhappy = [Integer(0)] + [None]*self.__memo_size 
+        self.__iteration_count = [0] + [None]*self.__memo_size 
         self.categorize_happy_unhappy()
 
     def categorize_happy_unhappy(self):
-        self.__cat_happy_unhappy = [Integer(0)]*len(self.__ssdd)
-        for i in range(1,len(self.__cat_happy_unhappy)):
-            self.__cat_happy_unhappy[i] = HappyNumberCounter.is_happy(i)
+        for i in range(len(self.__cat_happy_unhappy)-1, 0, -1):
+            if (self.__cat_happy_unhappy[i] is None):
+                self.is_happy(i)
 
-    def get_happy_number_count(self):
-        return Matrix(self.__ssdd).dot(Matrix(self.__cat_happy_unhappy))
+    def get_happy_number_count(self, ssdc:SumOfSquaredDigitsCalculator):
+        return Matrix(ssdc.get_sums_of_squared_digits_distribution()).dot(Matrix(self.__cat_happy_unhappy[:len(ssdc.get_sums_of_squared_digits_distribution())]))
 
-    def get_happy_number_fraction(self):
-        numerator = self.get_happy_number_count()
-        denumerator = sum(self.__ssdd)-Integer(1)
+    def get_happy_number_fraction(self, ssdc:SumOfSquaredDigitsCalculator):
+        numerator = self.get_happy_number_count(ssdc)
+        denumerator = sum(ssdc.get_sums_of_squared_digits_distribution())-Integer(1)
         return float((numerator/denumerator).evalf())
     
-    def get_happy_number_percentage(self):
-        return self.get_happy_number_fraction()*100.0
+    def get_happy_number_percentage(self, ssdc:SumOfSquaredDigitsCalculator):
+        return self.get_happy_number_fraction(ssdc)*100.0
 
-    @staticmethod
-    def is_happy(i):
+    def get_happy_number_iterations(self):
+        return [ic for ic,b in zip(self.__iteration_count,self.__cat_happy_unhappy) if b == Integer(1)]
+
+    def is_happy(self, i):
         outcome = HappyNumberCounter.sum_of_squared_digits(i) 
-        if (outcome == 1):
-            return Integer(1)
+        if (self.__cat_happy_unhappy[outcome] is not None):
+            self.__cat_happy_unhappy[i] = self.__cat_happy_unhappy[outcome]
+            self.__iteration_count[i] = self.__iteration_count[outcome] + 1
+        elif (outcome == 1):
+            self.__cat_happy_unhappy[i] = Integer(1)
+            self.__iteration_count[i] = 1
         elif (outcome == 4): # All unhappy numbers iterate eventually through the loop that includes 4. See reference [2].
-            return Integer(0)
+            self.__cat_happy_unhappy[i] = Integer(0)
+            self.__iteration_count[i] = 1
         else:
-            return HappyNumberCounter.is_happy(outcome)
+            self.__cat_happy_unhappy[i] = self.is_happy(outcome)
+            self.__iteration_count[i] = self.__iteration_count[outcome] + 1
+        return self.__cat_happy_unhappy[i]
 
     @staticmethod
     def sum_of_squared_digits(i:int) -> int:
@@ -176,21 +188,22 @@ class HappyNumberCounter():
 if __name__ == '__main__':
     base_path = 'results\\results_happy_numbers'
     sequence_id = 'A068571'
-    N = 250
+    N = 50
     results = []
 
     print()
     print(f'Happy Number Script for n in [0, {N:d}]')
     print(f'---------------------------------------')
 
-    ssd = SumOfSquaredDigitsCalculator()
-    hnc = HappyNumberCounter(ssd.get_sums_of_squared_digit_counts())
-    results.append((0, np.round(hnc.get_happy_number_fraction(),4), hnc.get_happy_number_count()))
+    ssdc = SumOfSquaredDigitsCalculator()
+    hnc = HappyNumberCounter()
+    results.append((0, np.round(hnc.get_happy_number_fraction(ssdc),4), hnc.get_happy_number_count(ssdc)))
     print(0, end='\r', flush=True)
     for n in range(1, N+1):
-        ssd.set_digit_count(n)
-        hnc = HappyNumberCounter(ssd.get_sums_of_squared_digit_counts())
-        results.append((n, np.round(hnc.get_happy_number_fraction(),4), hnc.get_happy_number_count()))
+        ssdc.set_digit_count(n)
+        # hnc = HappyNumberCounter(ssdc.get_sums_of_squared_digits_distribution())
+        # hnc.set_sum_of_squared_digits_distribution(ssdc.get_sums_of_squared_digits_distribution())
+        results.append((n, np.round(hnc.get_happy_number_fraction(ssdc),4), hnc.get_happy_number_count(ssdc)))
         print(f'Calculating for n = {n:d}', end='\r' if (n<N) else '\n', flush=True)
     print('Calculations done!')
     print()
@@ -212,3 +225,6 @@ if __name__ == '__main__':
     fig.update_traces(hovertemplate='%{y} of positive integers in ]0, 10^%{x}] is happy')
     fig.show()
     fig.write_html(os.path.join(base_path, sequence_id + '.html'))
+
+    s = pd.Series(hnc.get_happy_number_iterations())
+    print(s.value_counts())
