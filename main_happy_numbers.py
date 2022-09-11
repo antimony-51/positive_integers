@@ -218,16 +218,16 @@ if __name__ == '__main__':
             # print(df.groupby('iter_count')['frequency'].sum().astype(float)/float(df['frequency'].sum()))
 
             # df processing
-            total = Float(df['frequency'].sum())
+            total = Float(df['frequency'].sum()) + Float(1.0)
             parts = df.groupby('iter_count')['frequency'].sum()
-            result = [Integer(1), Integer(N-1)]
+            result = [Integer(1), Integer(n-1)]
             for i in parts.index:
                 result.append(parts[i])
-            result[2] -= Integer(N)
+            result[2] -= Integer(n-1)
             result_symbolic = [r/total for r in result]
             result_numeric = [float(r) for r in result_symbolic]
 
-            df_iter = pd.DataFrame({'numeric fraction': result_numeric, 'symbolic fraction': result_symbolic})
+            df_iter = pd.DataFrame({'iter_count': range(len(result_numeric)), 'numeric fraction': result_numeric, 'symbolic fraction': result_symbolic})
             df_iter.to_csv(os.path.join(base_path, 'iteration_distribution_for_n_' + str(n) + '.csv'), index=False)
             
             # print('symbolic')
