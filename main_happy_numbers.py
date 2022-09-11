@@ -9,7 +9,7 @@
 # ---------
 import os
 from typing import List
-from sympy import Integer, Matrix, N
+from sympy import Integer, Matrix, N, Float
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -96,7 +96,7 @@ class SumOfSquaredDigitsCalculator():
                     self.__value_counts[i] = sum([self.__value_counts[i - sd] for sd in SumOfSquaredDigitsCalculator.squared_digits])
                 self.__n_digits += 1
             self.__value_counts = self.__value_counts[SumOfSquaredDigitsCalculator.offset:]
-        self.__value_counts[1] += Integer(1) # Take into account 10^n, whose sum of squared digits is 1.
+        # self.__value_counts[1] += Integer(1) # Take into account 10^n, whose sum of squared digits is 1.
 
     def get_sums_of_squared_digits_distribution(self) -> List[Integer]:
         """Get the distribution of sums of squared digits.
@@ -113,6 +113,8 @@ class SumOfSquaredDigitsCalculator():
             and the values denote the absolute frequencies of occurence for
             all non-negative integers in [0, 10^n].
         """
+        # adjusted_value_counts = self.__value_counts
+        # adjusted_value_counts[1] += Integer(1) # Take into account 10^n, whose sum of squared digits is 1.
         return self.__value_counts
 
 class HappyNumberCounter():
@@ -145,18 +147,19 @@ class HappyNumberCounter():
                 self.is_happy(i)
 
     def get_happy_number_count(self, ssdc:SumOfSquaredDigitsCalculator):
-        return Matrix(ssdc.get_sums_of_squared_digits_distribution()).dot(Matrix(self.__cat_happy_unhappy[:len(ssdc.get_sums_of_squared_digits_distribution())]))
+        return Integer(1) + Matrix(ssdc.get_sums_of_squared_digits_distribution()).dot(Matrix(self.__cat_happy_unhappy[:len(ssdc.get_sums_of_squared_digits_distribution())]))
+        
 
     def get_happy_number_fraction(self, ssdc:SumOfSquaredDigitsCalculator):
         numerator = self.get_happy_number_count(ssdc)
-        denumerator = sum(ssdc.get_sums_of_squared_digits_distribution())-Integer(1)
+        denumerator = sum(ssdc.get_sums_of_squared_digits_distribution())#-Integer(1)
         return float((numerator/denumerator).evalf())
     
     def get_happy_number_percentage(self, ssdc:SumOfSquaredDigitsCalculator):
         return self.get_happy_number_fraction(ssdc)*100.0
 
-    def get_happy_number_iterations(self):
-        return [ic for ic,b in zip(self.__iteration_count,self.__cat_happy_unhappy) if b == Integer(1)]
+    def get_happy_number_iterations(self, ssdc:SumOfSquaredDigitsCalculator):
+        return [(ic, freq) for ic,freq,b in zip(self.__iteration_count,ssdc.get_sums_of_squared_digits_distribution(),self.__cat_happy_unhappy) if b == Integer(1)]
 
     def is_happy(self, i):
         outcome = HappyNumberCounter.sum_of_squared_digits(i) 
@@ -188,7 +191,8 @@ class HappyNumberCounter():
 if __name__ == '__main__':
     base_path = 'results\\results_happy_numbers'
     sequence_id = 'A068571'
-    N = 50
+    N = 101
+    n_iter_view = [10**i for i in range(1,5)]
     results = []
 
     print()
@@ -205,6 +209,33 @@ if __name__ == '__main__':
         # hnc.set_sum_of_squared_digits_distribution(ssdc.get_sums_of_squared_digits_distribution())
         results.append((n, np.round(hnc.get_happy_number_fraction(ssdc),4), hnc.get_happy_number_count(ssdc)))
         print(f'Calculating for n = {n:d}', end='\r' if (n<N) else '\n', flush=True)
+
+        if n in n_iter_view:
+            # print iters
+            # -----------
+            result = hnc.get_happy_number_iterations(ssdc)
+            df = pd.DataFrame(result, columns=['iter_count', 'frequency'])
+            # print(df.groupby('iter_count')['frequency'].sum().astype(float)/float(df['frequency'].sum()))
+
+            # df processing
+            total = Float(df['frequency'].sum())
+            parts = df.groupby('iter_count')['frequency'].sum()
+            result = [Integer(1), Integer(N-1)]
+            for i in parts.index:
+                result.append(parts[i])
+            result[2] -= Integer(N)
+            result_symbolic = [r/total for r in result]
+            result_numeric = [float(r) for r in result_symbolic]
+
+            df_iter = pd.DataFrame({'numeric fraction': result_numeric, 'symbolic fraction': result_symbolic})
+            df_iter.to_csv(os.path.join(base_path, 'iteration_distribution_for_n_' + str(n) + '.csv'), index=False)
+            
+            # print('symbolic')
+            # print(result_symbolic)
+            print(n)
+            print('numeric')
+            print(result_numeric)
+
     print('Calculations done!')
     print()
 
@@ -226,5 +257,23 @@ if __name__ == '__main__':
     fig.show()
     fig.write_html(os.path.join(base_path, sequence_id + '.html'))
 
-    s = pd.Series(hnc.get_happy_number_iterations())
-    print(s.value_counts())
+'''
+    result = hnc.get_happy_number_iterations(ssdc)
+    df = pd.DataFrame(result, columns=['iter_count', 'frequency'])
+    # print(df.groupby('iter_count')['frequency'].sum().astype(float)/float(df['frequency'].sum()))
+
+    # df processing
+    total = Float(df['frequency'].sum())
+    parts = df.groupby('iter_count')['frequency'].sum()
+    result = [Integer(1), Integer(N-1)]
+    for i in parts.index:
+        result.append(parts[i])
+    result[2] -= Integer(N)
+    result_symbolic = [r/total for r in result]
+    result_numeric = [float(r) for r in result_symbolic]
+
+    print('symbolic')
+    print(result_symbolic)
+    print('numeric')
+    print(result_numeric)
+'''
